@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Slide Conducteur 3D</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0b0f19;
+            font-family: Arial, sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            pointer-events: none;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="info">Cliquez sur la carte pour basculer entre le Recto et le Verso</div>
+
+    <!-- Importation de Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // 1. Initialisation de la scène, de la caméra et du rendu
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lumière
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 2);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+
+        // 2. Création de la texture pour le RECTO
+        function createCardTexture(title, text, isBack = false) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 768;
+            const ctx = canvas.getContext('2d');
+
+            // Fond de la carte
+            ctx.fillStyle = isBack ? '#1e293b' : '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Bordure
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 15;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            // En-tête
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = 'bold 36px Arial';
+            ctx.fillText(isBack ? "01 / 30 — SOURCES & RÉFÉRENCES" : "01 / 30 — EXOSQUELETTES / REINHO", 60, 80);
+
+            // Titre principal
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 50px Arial';
+            ctx.fillText(title, 60, 180);
+
+            // Corps du texte
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '32px Arial';
+            wrapText(ctx, text, 60, 280, 900, 45);
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // Fonction utilitaire pour couper le texte en plusieurs lignes
+        function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+            const words = text.split(' ');
+            let line = '';
+            for(let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                let metrics = ctx.measureText(testLine);
+                let testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    ctx.fillText(line, x, y);
+                    line = words[n] + ' ';
+                    y += lineHeight;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, x, y);
+        }
+
+        // Textes recto et verso
+        const rectoText = "L'exosquelette réel commence par un geste ordinaire. Le mot exosquelette recouvre plusieurs machines : certaines ajoutent de la puissance avec des moteurs, d'autres redistribuent les efforts.";
+        const versoText = "Sources bibliographiques :\n1. Popular Science - Les exosquelettes militaires\n2. Military Trade - Analyse des déploiements\n3. Myo Institute - Rapports de recherche biomécanique";
+
+        const textureRecto = createCardTexture("L'exosquelette et le terrain", rectoText, false);
+        const textureVerso = createCardTexture("Références & Données", versoText, true);
+
+        // 3. Création de la géométrie de la carte (Mesh 3D)
+        const geometry = new THREE.PlaneGeometry(4.2, 3.2); // Format 4:3 de la carte
+        
+        // Matériau avec les deux faces différentes
+        const materials = [
+            new THREE.MeshBasicMaterial({ map: textureRecto, side: THREE.FrontSide }),
+            new THREE.MeshBasicMaterial({ map: textureVerso, side: THREE.BackSide })
+        ];
+
+        // Pour faire simple avec une texture recto/verso sur un plan Three.js standard :
+        const material = new THREE.MeshStandardMaterial({ 
+            map: textureRecto, 
+            roughness: 0.4 
+        });
+
+        const card = new THREE.Mesh(geometry, material);
+        scene.add(card);
+
+        camera.position.z = 6;
+
+        // 4. Interaction : Rotation au clic (effet recto/verso)
+        let targetRotationY = 0;
+        let showingBack = false;
+
+        window.addEventListener('click', () => {
+            showingBack = !showingBack;
+            targetRotationY += Math.PI; // Pivoter de 180 degrés
+            // Changer la texture au milieu de la rotation (ou simplement basculer)
+            setTimeout(() => {
+                card.material.map = showingBack ? textureVerso : textureRecto;
+                card.material.needsUpdate = true;
+            }, 250);
+        });
+
+        // 5. Boucle d'animation fluide
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Interpolation fluide vers la rotation cible (Effet Smooth / Inertie)
+            card.rotation.y += (targetRotationY - card.rotation.y) * 0.1;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Gestion du redimensionnement de la fenêtre
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
